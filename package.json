@@ -1,11 +1,15 @@
 {
   "name": "n8n-nodes-kora",
-  "version": "2.1.0",
+  "version": "2.1.3",
   "description": "Kora deterministic authorization for AI agent spending",
   "keywords": [
     "n8n-community-node-package"
   ],
   "license": "MIT",
+  "author": {
+    "name": "Idkasam",
+    "email": "christoffer@koraprotocol.com"
+  },
   "homepage": "https://github.com/Idkasam/n8n-nodes-kora",
   "repository": {
     "type": "git",

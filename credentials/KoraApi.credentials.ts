@@ -1,4 +1,6 @@
 import {
+  IAuthenticateGeneric,
+  ICredentialTestRequest,
   ICredentialType,
   INodeProperties,
 } from 'n8n-workflow';
@@ -8,11 +10,19 @@ export class KoraApi implements ICredentialType {
   displayName = 'Kora API';
   documentationUrl = 'https://github.com/Idkasam/Kora';
 
-  // Credential test: hits /health to verify API URL is reachable
-  test = {
+  authenticate: IAuthenticateGeneric = {
+    type: 'generic',
+    properties: {
+      headers: {
+        Authorization: '={{"Bearer " + $credentials.agentSecret}}',
+      },
+    },
+  };
+
+  test: ICredentialTestRequest = {
     request: {
-      method: 'GET' as const,
-      url: '={{$credentials.apiUrl}}/health',
+      baseURL: '={{$credentials.apiUrl}}',
+      url: '/health',
     },
   };
 
