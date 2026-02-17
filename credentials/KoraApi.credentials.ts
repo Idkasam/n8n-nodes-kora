@@ -9,23 +9,6 @@ export class KoraApi implements ICredentialType {
   name = 'koraApi';
   displayName = 'Kora API';
   documentationUrl = 'https://github.com/Idkasam/Kora';
-
-  authenticate: IAuthenticateGeneric = {
-    type: 'generic',
-    properties: {
-      headers: {
-        Authorization: '={{"Bearer " + $credentials.agentSecret}}',
-      },
-    },
-  };
-
-  test: ICredentialTestRequest = {
-    request: {
-      baseURL: '={{$credentials.apiUrl}}',
-      url: '/health',
-    },
-  };
-
   properties: INodeProperties[] = [
     {
       displayName: 'Agent Secret Key',
@@ -54,4 +37,18 @@ export class KoraApi implements ICredentialType {
       description: 'Kora API base URL',
     },
   ];
+  authenticate: IAuthenticateGeneric = {
+    type: 'generic',
+    properties: {
+      headers: {
+        Authorization: '={{"Bearer " + $credentials.agentSecret}}',
+      },
+    },
+  };
+  test: ICredentialTestRequest = {
+    request: {
+      baseURL: '={{$credentials.apiUrl}}',
+      url: '/health',
+    },
+  };
 }
