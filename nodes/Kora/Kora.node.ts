@@ -53,26 +53,13 @@ async function doSpend(
   if (category) body.category = category;
   if (purpose) body.purpose = purpose;
 
-  let response: any;
-  try {
-    response = await ctx.helpers.httpRequest({
-      method: 'POST',
-      url: `${apiUrl}/v1/authorize`,
-      headers,
-      body: JSON.stringify(body),
-      returnFullResponse: true,
-    });
-  } catch (error: any) {
-    const status = error?.response?.status ?? error?.statusCode;
-    if (status && status >= 500) {
-      throw new NodeOperationError(
-        ctx.getNode(),
-        `Kora returned ${status}. Workflow stopped — no authorization = no payment.`,
-        { itemIndex },
-      );
-    }
-    throw error;
-  }
+  const response = await ctx.helpers.httpRequest({
+    method: 'POST',
+    url: `${apiUrl}/v1/authorize`,
+    headers,
+    body: JSON.stringify(body),
+    returnFullResponse: true,
+  });
 
   const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
 
@@ -239,6 +226,7 @@ export class Kora implements INodeType {
         name: 'category',
         type: 'string',
         default: '',
+        placeholder: 'cloud_compute',
         description: 'Spending category (optional).',
         displayOptions: { show: { operation: ['spend'] } },
       },
@@ -247,6 +235,7 @@ export class Kora implements INodeType {
         name: 'purpose',
         type: 'string',
         default: '',
+        placeholder: 'Monthly server hosting',
         description: 'Why this spend is needed (optional).',
         displayOptions: { show: { operation: ['spend'] } },
       },
@@ -269,19 +258,54 @@ export class Kora implements INodeType {
         if (operation === 'spend') {
           const result = await doSpend(this, i, credentials, apiUrl, mandateId);
           if (result.decision === 'APPROVED') {
-            approved.push({ json: result });
+            approved.push({ json: result, pairedItem: { item: i } });
           } else {
-            denied.push({ json: result });
+            denied.push({ json: result, pairedItem: { item: i } });
           }
         } else if (operation === 'checkBudget') {
           const result = await doBudget(this, i, credentials, apiUrl, mandateId);
-          approved.push({ json: result });
+          approved.push({ json: result, pairedItem: { item: i } });
         } else if (operation === 'health') {
           const result = await doHealth(this, apiUrl);
-          approved.push({ json: result });
+          approved.push({ json: result, pairedItem: { item: i } });
         }
       } catch (error: any) {
+        if (this.continueOnFail()) {
+          denied.push({ json: { error: error.message }, pairedItem: { item: i } });
+          continue;
+        }
         if (error instanceof NodeOperationError) throw error;
+        const status = Number(error?.httpCode ?? error?.response?.status ?? error?.statusCode ?? 0);
+        const body = error?.response?.body;
+        let serverMsg = '';
+        if (body) {
+          try {
+            const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+            serverMsg = parsed.message ?? parsed.error?.message ?? parsed.detail ?? '';
+          } catch {}
+        }
+        if (status === 400) {
+          throw new NodeOperationError(this.getNode(), `Bad request: ${serverMsg || error.message}`, { itemIndex: i });
+        }
+        if (status === 401) {
+          throw new NodeOperationError(this.getNode(), 'Invalid credentials', { itemIndex: i });
+        }
+        if (status === 403) {
+          throw new NodeOperationError(this.getNode(), 'Forbidden', { itemIndex: i });
+        }
+        if (status === 404) {
+          throw new NodeOperationError(this.getNode(), `Not found: ${serverMsg || error.message}`, { itemIndex: i });
+        }
+        if (status === 429) {
+          throw new NodeOperationError(this.getNode(), 'Rate limited — retry later', { itemIndex: i });
+        }
+        if (status >= 500) {
+          throw new NodeOperationError(
+            this.getNode(),
+            `Kora returned ${status}. Workflow stopped — no authorization = no payment.`,
+            { itemIndex: i },
+          );
+        }
         throw new NodeOperationError(
           this.getNode(),
           `Kora unavailable: ${error.message}. No authorization = no payment.`,
