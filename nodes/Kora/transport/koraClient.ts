@@ -3,9 +3,7 @@ import * as crypto from 'crypto';
 // ===========================================
 // Parse agent secret key
 // ===========================================
-// Format: kora_agent_sk_{agentId}_{hexSeed}
-// agentId: 12 chars
-// hexSeed: 64 hex chars (32 bytes)
+// Format: kora_agent_sk_{base64(agentId:hexSeed)}
 
 export interface AgentKeys {
   agentId: string;
@@ -17,19 +15,20 @@ export function parseAgentSecret(secret: string): AgentKeys {
     throw new Error('Invalid agent secret: must start with kora_agent_sk_');
   }
 
-  const payload = secret.slice('kora_agent_sk_'.length);
-  const underscoreIndex = payload.indexOf('_');
+  const b64 = secret.slice('kora_agent_sk_'.length);
+  const decoded = Buffer.from(b64, 'base64').toString('utf-8');
+  const colonIndex = decoded.indexOf(':');
 
-  if (underscoreIndex === -1) {
+  if (colonIndex === -1) {
     throw new Error('Invalid agent secret format: missing key separator');
   }
 
-  const agentId = payload.slice(0, underscoreIndex);
-  const hexSeed = payload.slice(underscoreIndex + 1);
+  const agentId = decoded.slice(0, colonIndex);
+  const hexSeed = decoded.slice(colonIndex + 1);
   const privateKey = Buffer.from(hexSeed, 'hex');
 
   if (privateKey.length !== 32) {
-    throw new Error(`Invalid key seed: expected 32 bytes, got ${privateKey.length}`);
+    throw new Error('Invalid key seed: expected 32 bytes, got ' + privateKey.length);
   }
 
   return { agentId, privateKey };
