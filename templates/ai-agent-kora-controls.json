@@ -1,0 +1,111 @@
+{
+  "name": "AI Agent with Kora Financial Controls",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a procurement assistant for an AI infrastructure team.\n\nRules:\n1. Before ANY purchase, payment, or financial commitment, you MUST call the kora_authorize_spend tool.\n2. If Kora returns DENIED, you MUST NOT proceed. Explain the denial reason to the user.\n3. If Kora returns APPROVED, describe what you would do next (e.g., call the payment API).\n4. Never skip authorization. Never approximate amounts. Always use exact cents.\n\nYou help with tasks like purchasing cloud compute, API credits, and software licenses."
+        },
+        "promptType": "define",
+        "text": "={{ $json.chatInput ?? 'Purchase 50 EUR of compute on AWS for the inference pipeline' }}"
+      },
+      "id": "agent-1",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "openai-1",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [400, 500],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mandateId": "={{ $env.KORA_MANDATE_ID ?? 'mandate_your_id_here' }}",
+        "toolDescription": ""
+      },
+      "id": "kora-tool-1",
+      "name": "Kora Authorize Spend",
+      "type": "n8n-nodes-kora.koraTool",
+      "typeVersion": 1,
+      "position": [560, 500],
+      "credentials": {
+        "koraAgentApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kora Authorize Spend": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "tags": [
+    { "name": "AI" },
+    { "name": "payments" },
+    { "name": "kora" }
+  ]
+}

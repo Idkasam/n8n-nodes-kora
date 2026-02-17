@@ -1,0 +1,240 @@
+{
+  "name": "Automated Invoice Processing with Kora Gate",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Invoice Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "invoice-inbound"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-vendor",
+              "name": "vendor_id",
+              "value": "={{ $json.body.vendor ?? $json.body.supplier_id ?? 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-amount",
+              "name": "amount_cents",
+              "value": "={{ Math.round(($json.body.amount ?? $json.body.total ?? 0) * 100) }}",
+              "type": "number"
+            },
+            {
+              "id": "set-currency",
+              "name": "currency",
+              "value": "={{ ($json.body.currency ?? 'EUR').toUpperCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "set-invoice-id",
+              "name": "invoice_id",
+              "value": "={{ $json.body.invoice_id ?? $json.body.id ?? 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-purpose",
+              "name": "purpose",
+              "value": "=Invoice {{ $json.body.invoice_id ?? '' }} from {{ $json.body.vendor ?? $json.body.supplier_id ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "parse-1",
+      "name": "Parse Invoice",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mandateId": "={{ $env.KORA_MANDATE_ID ?? 'mandate_your_id_here' }}",
+        "amountCents": "={{ $json.amount_cents }}",
+        "currency": "={{ $json.currency }}",
+        "vendorId": "={{ $json.vendor_id }}",
+        "preCheckBudget": true,
+        "minimumRequired": 0,
+        "category": "",
+        "purpose": "={{ $json.purpose }}"
+      },
+      "id": "gate-1",
+      "name": "Kora Gate",
+      "type": "n8n-nodes-kora.koraGate",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "koraAgentApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYMENT_API_URL ?? 'https://api.example.com/payments' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.PAYMENT_API_KEY ?? '' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "amount_cents",
+              "value": "={{ $json.amount_cents }}"
+            },
+            {
+              "name": "currency",
+              "value": "={{ $json.currency }}"
+            },
+            {
+              "name": "decision_id",
+              "value": "={{ $json.decision_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "payment-1",
+      "name": "Send Payment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 160]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.SLACK_CHANNEL ?? '#finance-alerts' }}"
+        },
+        "text": "=:x: *Invoice Denied*\n\nInvoice: `{{ $('Parse Invoice').item.json.invoice_id }}`\nVendor: `{{ $('Parse Invoice').item.json.vendor_id }}`\nAmount: {{ $('Parse Invoice').item.json.amount_cents / 100 }} {{ $('Parse Invoice').item.json.currency }}\nReason: `{{ $json.reason_code }}`",
+        "otherOptions": {}
+      },
+      "id": "slack-denied-1",
+      "name": "Notify Denied",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [940, 340],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.SLACK_CHANNEL ?? '#finance-alerts' }}"
+        },
+        "text": "=:warning: *Invoice Queued for Review — Insufficient Budget*\n\nInvoice: `{{ $('Parse Invoice').item.json.invoice_id }}`\nVendor: `{{ $('Parse Invoice').item.json.vendor_id }}`\nRequested: {{ $('Parse Invoice').item.json.amount_cents / 100 }} {{ $('Parse Invoice').item.json.currency }}\nDaily Remaining: {{ $json.daily_remaining_cents / 100 }} {{ $('Parse Invoice').item.json.currency }}",
+        "otherOptions": {}
+      },
+      "id": "slack-review-1",
+      "name": "Queue for Review",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [940, 520],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Invoice Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Invoice": {
+      "main": [
+        [
+          {
+            "node": "Kora Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kora Gate": {
+      "main": [
+        [
+          {
+            "node": "Send Payment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Denied",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Queue for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "tags": [
+    { "name": "payments" },
+    { "name": "invoices" },
+    { "name": "kora" }
+  ]
+}
