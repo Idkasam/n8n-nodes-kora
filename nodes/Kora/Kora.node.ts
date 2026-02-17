@@ -32,8 +32,10 @@ async function doSpend(
     throw new NodeOperationError(ctx.getNode(), 'Amount must be greater than 0', { itemIndex });
   }
 
-  // Build request body
-  const body: Record<string, any> = {
+  // Signed fields must match server's verify_signature_with_key exactly:
+  // intent_id, agent_id, mandate_id, amount_cents, currency, vendor_id, nonce, ttl_seconds
+  // (plus payment_instruction and metadata only when non-empty)
+  const signedFields: Record<string, any> = {
     intent_id: deriveIntentId(executionId, itemIndex, 'authorize'),
     agent_id: keys.agentId,
     mandate_id: mandateId,
@@ -42,13 +44,14 @@ async function doSpend(
     vendor_id: vendor,
     nonce: generateNonce(),
     ttl_seconds: 300,
-    metadata: {},
   };
+
+  const { headers } = buildSignedHeaders(signedFields, keys);
+
+  // Full HTTP body may include extra fields the server processes but does not sign
+  const body: Record<string, any> = { ...signedFields };
   if (category) body.category = category;
   if (purpose) body.purpose = purpose;
-
-  // Sign and send
-  const { canonicalBody, headers } = buildSignedHeaders(body, keys);
 
   let response: any;
   try {
@@ -56,7 +59,7 @@ async function doSpend(
       method: 'POST',
       url: `${apiUrl}/v1/authorize`,
       headers,
-      body: canonicalBody,
+      body: JSON.stringify(body),
       returnFullResponse: true,
     });
   } catch (error: any) {
@@ -114,8 +117,8 @@ async function doBudget(
   });
 
   const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
-  const dailyLimit = data.daily_limit_cents ?? 0;
-  const dailySpent = data.daily_spent_cents ?? 0;
+  const dailyLimit = data.daily?.limit_cents ?? 0;
+  const dailySpent = data.daily?.spent_cents ?? 0;
 
   return {
     mandate_id: data.mandate_id,
@@ -123,11 +126,11 @@ async function doBudget(
     status: data.status,
     daily_limit_cents: dailyLimit,
     daily_spent_cents: dailySpent,
-    daily_remaining_cents: data.daily_remaining_cents ?? 0,
-    monthly_limit_cents: data.monthly_limit_cents ?? 0,
-    monthly_spent_cents: data.monthly_spent_cents ?? 0,
-    monthly_remaining_cents: data.monthly_remaining_cents ?? 0,
-    can_spend: data.status === 'active' && (data.daily_remaining_cents ?? 0) > 0,
+    daily_remaining_cents: data.daily?.remaining_cents ?? 0,
+    monthly_limit_cents: data.monthly?.limit_cents ?? 0,
+    monthly_spent_cents: data.monthly?.spent_cents ?? 0,
+    monthly_remaining_cents: data.monthly?.remaining_cents ?? 0,
+    can_spend: data.spend_allowed ?? false,
     percent_daily_used: dailyLimit > 0 ? Math.round((dailySpent / dailyLimit) * 100) : 0,
   };
 }

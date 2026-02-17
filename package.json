@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-kora",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "Kora deterministic authorization for AI agent spending",
   "keywords": [
     "n8n-community-node-package"
