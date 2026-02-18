@@ -1,5 +1,7 @@
 # n8n-nodes-kora
 
+**n8n community node for Kora — deterministic authorization for AI agent spending.**
+
 **Financial authorization gate for AI agent workflows.** Drop one node into any n8n workflow — every spend gets an APPROVED or DENIED decision with a cryptographic Ed25519 seal before money moves.
 
 No Kora approval → no payment. By design.
