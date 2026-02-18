@@ -100,13 +100,20 @@ If anything fails → DENIED with machine-readable reason + human-readable sugge
 
 This node uses zero production npm dependencies. All cryptographic operations (Ed25519 signing, canonical JSON, nonce generation) use Node.js built-in `crypto`. HTTP calls use n8n's native `this.helpers.httpRequest`. This passes n8n's security scanner for Cloud deployment.
 
+
+## Also available as
+
+| Package | Description |
+|---|---|
+| [kora-sdk](https://github.com/Idkasam/kora-sdk) | Python + TypeScript SDK — 5 lines to authorized spend |
+| [kora-mcp-server](https://github.com/Idkasam/kora-mcp-server) | MCP server — add Kora to Claude Desktop with zero code |
+
 ## Links
 
-- **Kora**: [github.com/Idkasam/Kora](https://github.com/Idkasam/Kora)
-- **API Reference**: [API_REFERENCE.md](https://github.com/Idkasam/Kora/blob/main/docs/API_REFERENCE.md)
-- **MCP Server**: [github.com/Idkasam/kora-mcp-server](https://github.com/Idkasam/kora-mcp-server)
-- **Patent**: PCT/EP2025/053553
+- **Website:** [koraprotocol.com](https://koraprotocol.com)
+- **npm:** [n8n-nodes-kora](https://www.npmjs.com/package/n8n-nodes-kora)
+- **Patent:** PCT/EP2025/053553
 
 ## License
 
-MIT — see [LICENSE](./LICENSE)
+Apache 2.0
